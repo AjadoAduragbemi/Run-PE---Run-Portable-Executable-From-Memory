@@ -30,7 +30,7 @@ HANDLE MapFileToMemory(LPCSTR filename){
 	return 0;
 }
 
-static int RunPortableExecutable(void* Image)
+int RunPortableExecutable(void* Image)
 {
 	IMAGE_DOS_HEADER* DOSHeader = {0}; // For Nt DOS Header symbols
 	IMAGE_NT_HEADERS* NtHeader  = {0}; // For Nt PE Header objects & symbols
@@ -48,13 +48,18 @@ static int RunPortableExecutable(void* Image)
 	char CurrentFilePath[1024];
 
 	DOSHeader = PIMAGE_DOS_HEADER(Image); // Initialize Variable
-
-	if(DOSHeader->e_magic == IMAGE_DOS_SIGNATURE)
-		NtHeader = PIMAGE_NT_HEADERS(DWORD(Image) + DOSHeader->e_lfanew); // Initialize
+	NtHeader = PIMAGE_NT_HEADERS(DWORD(Image) + DOSHeader->e_lfanew); // Initialize
+	DWORD NtSignature = 0;
 
 	GetModuleFileNameA(0, CurrentFilePath, 1024); // path to current executable
 
-	if (NtHeader && NtHeader->Signature == IMAGE_NT_SIGNATURE) // Check if image is a PE File.
+	__try{
+		NtSignature = NtHeader->Signature;
+	}__except(EXCEPTION_EXECUTE_HANDLER){
+		
+	}
+
+	if (NtSignature == IMAGE_NT_SIGNATURE) // Check if image is a PE File.
 	{
 		ZeroMemory(&PI, sizeof(PI)); // Null the memory
 		ZeroMemory(&SI, sizeof(SI)); // Null the memory
