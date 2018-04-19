@@ -13,6 +13,8 @@
 	#define CONTEXTBX(CTX) CTX->Ebx
 #endif
 
+#define PE_INVALID -1
+
 // use this if you want to read the executable from disk
 HANDLE MapFileToMemory(LPCSTR filename){
 	std::streampos size;
@@ -28,10 +30,10 @@ HANDLE MapFileToMemory(LPCSTR filename){
 	return 0;
 }
 
-int RunPortableExecutable(void* Image)
+static int RunPortableExecutable(void* Image)
 {
-	IMAGE_DOS_HEADER* DOSHeader; // For Nt DOS Header symbols
-	IMAGE_NT_HEADERS* NtHeader; // For Nt PE Header objects & symbols
+	IMAGE_DOS_HEADER* DOSHeader = {0}; // For Nt DOS Header symbols
+	IMAGE_NT_HEADERS* NtHeader  = {0}; // For Nt PE Header objects & symbols
 	IMAGE_SECTION_HEADER* SectionHeader;
 
 	PROCESS_INFORMATION PI;
@@ -46,11 +48,13 @@ int RunPortableExecutable(void* Image)
 	char CurrentFilePath[1024];
 
 	DOSHeader = PIMAGE_DOS_HEADER(Image); // Initialize Variable
-	NtHeader = PIMAGE_NT_HEADERS(DWORD(Image) + DOSHeader->e_lfanew); // Initialize
+
+	if(DOSHeader->e_magic == IMAGE_DOS_SIGNATURE)
+		NtHeader = PIMAGE_NT_HEADERS(DWORD(Image) + DOSHeader->e_lfanew); // Initialize
 
 	GetModuleFileNameA(0, CurrentFilePath, 1024); // path to current executable
 
-	if (NtHeader->Signature == IMAGE_NT_SIGNATURE) // Check if image is a PE File.
+	if (NtHeader && NtHeader->Signature == IMAGE_NT_SIGNATURE) // Check if image is a PE File.
 	{
 		ZeroMemory(&PI, sizeof(PI)); // Null the memory
 		ZeroMemory(&SI, sizeof(SI)); // Null the memory
@@ -89,9 +93,11 @@ int RunPortableExecutable(void* Image)
 				SetThreadContext(PI.hThread, LPCONTEXT(CTX)); // Set the context
 				ResumeThread(PI.hThread); //´Start the process/call main()
 
-				return 0; // Operation was successful.
+				return S_OK; // Operation was successful.
 			}
 		}
+	}else{
+		return PE_INVALID;
 	}
 }
 
